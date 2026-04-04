@@ -1,0 +1,191 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.version)
+    
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Set version in package.json
+        run: |
+          $packageJson = Get-Content -Path "frontend/package.json" -Raw | ConvertFrom-Json
+          $packageJson.version = "${{ env.VERSION }}"
+          $packageJson | ConvertTo-Json -Depth 100 | Set-Content -Path "frontend/package.json"
+        shell: pwsh
+
+      - name: Build Windows application
+        run: wails build -platform windows/amd64
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apichecker-windows-amd64
+          path: build/bin/apichecker.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.version)
+    
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev libx11-dev libxkbfile-dev libsecret-1-dev libsoup-3.0-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Set version in package.json
+        run: |
+          cd frontend
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.version = '${{ env.VERSION }}'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
+      - name: Build Linux application
+        run: |
+          wails build -tags webkit2_41 -platform linux/amd64
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apichecker-linux-amd64
+          path: build/bin/apichecker
+
+  build-macos:
+    runs-on: macos-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.version)
+    
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Set version in package.json
+        run: |
+          cd frontend
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.version = '${{ env.VERSION }}'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
+      - name: Build macOS application
+        run: wails build -platform darwin/universal
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apichecker-macos-universal
+          path: build/bin/apichecker.app
+
+  create-release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.version)
+    
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+    
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apichecker-windows-amd64
+          path: ./release
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apichecker-linux-amd64
+          path: ./release
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apichecker-macos-universal
+          path: ./release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          files: |
+            ./release/apichecker.exe
+            ./release/apichecker
+            ./release/apichecker.app
+          generate_release_notes: true
+          draft: false
+          prerelease: false
