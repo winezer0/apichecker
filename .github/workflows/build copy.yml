@@ -1,0 +1,87 @@
+name: Build Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.version)
+    
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Set version in package.json
+        run: |
+          $packageJson = Get-Content -Path "frontend/package.json" -Raw | ConvertFrom-Json
+          $packageJson.version = "${{ env.VERSION }}"
+          $packageJson | ConvertTo-Json -Depth 100 | Set-Content -Path "frontend/package.json"
+        shell: pwsh
+
+      - name: Build Windows application
+        run: wails build -platform windows/amd64
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apichecker-windows-amd64
+          path: build/bin/apichecker.exe
+
+  create-release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.version)
+    
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+    
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apichecker-windows-amd64
+          path: ./release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          files: |
+            ./release/apichecker.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
