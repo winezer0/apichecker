@@ -185,7 +185,8 @@ jobs:
           files: |
             ./release/apichecker.exe
             ./release/apichecker
-            ./release/apichecker.app
           generate_release_notes: true
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
