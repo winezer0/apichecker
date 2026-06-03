@@ -1,6 +1,13 @@
-# API Checker
+<img width="1279" height="796" alt="Snipaste_2026-06-03_16-40-47" src="https://github.com/user-attachments/assets/1ecbc3fc-c9eb-487e-8531-e82033992c6c" /># API Checker
 
 一个用于批量检测和管理 API Key 的桌面工具。
+
+用于解决一些不知道LLM API key有什么模型 ID 的问题
+
+<img width="1279" height="796" alt="Snipaste_2026-06-03_16-40-47" src="https://github.com/user-attachments/assets/e7300cb4-941f-4b3e-89ae-c47777ce90ec" />
+
+<img width="895" height="500" alt="Snipaste_2026-06-03_16-42-46" src="https://github.com/user-attachments/assets/35479d16-7bfa-4b05-9c23-3a024d0eae1d" />
+
 
 ## 功能特点
 
