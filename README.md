@@ -99,6 +99,10 @@ wails build -platform darwin/universal
 
 API Key 使用 AES-GCM 加密算法进行加密存储，加密密钥基于为空时由机器码派生，只有在当前机器上才能解密查看 API Key 内容。
 
+## BUG
+
+已知加密后如果错误密码次数超出后可能会导致配置文件被清空（暂时可以不配置密码使用）
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
